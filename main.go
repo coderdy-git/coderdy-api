@@ -474,6 +474,115 @@ func handleMe(c *gin.Context) {
 	})
 }
 
+func handleForgotPassword(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		JSONResponse(c, 400, "error", "Valid email is required", nil)
+		return
+	}
+
+	var username string
+	err := db.QueryRow("SELECT username FROM users WHERE email = ?", req.Email).Scan(&username)
+	if err != nil {
+		// Untuk keamanan, jangan beri tahu jika email tidak ada, tapi tetap beri respon sukses
+		JSONResponse(c, 200, "success", "If your email is registered, you will receive a reset link.", nil)
+		return
+	}
+
+	token := generateRandomToken()
+	_, err = db.Exec("UPDATE users SET verification_token = ? WHERE email = ?", token, req.Email)
+	if err != nil {
+		JSONResponse(c, 500, "error", "Failed to process request", nil)
+		return
+	}
+
+	// Kirim Email
+	apiKey := os.Getenv("RESEND_API_KEY")
+	appURL := os.Getenv("APP_URL")
+	resetLink := fmt.Sprintf("%s/api/v1/auth/reset-password?token=%s", appURL, token)
+
+	payload := map[string]interface{}{
+		"from":    os.Getenv("EMAIL_FROM"),
+		"to":      []string{req.Email},
+		"subject": "Reset Password Akun WA Gateway",
+		"html":    fmt.Sprintf("<strong>Halo!</strong><p>Anda meminta untuk reset password. Klik link di bawah ini:</p><a href='%s'>Reset Password Sekarang</a><p>Jika Anda tidak meminta ini, abaikan saja email ini.</p>", resetLink),
+	}
+
+	jsonPayload, _ := json.Marshal(payload)
+	reqHttp, _ := http.NewRequest("POST", "https://api.resend.com/emails", strings.NewReader(string(jsonPayload)))
+	reqHttp.Header.Set("Authorization", "Bearer "+apiKey)
+	reqHttp.Header.Set("Content-Type", "application/json")
+
+	httpClient := &http.Client{Timeout: 10 * time.Second}
+	resp, _ := httpClient.Do(reqHttp)
+	if resp != nil {
+		resp.Body.Close()
+	}
+
+	JSONResponse(c, 200, "success", "If your email is registered, you will receive a reset link.", nil)
+}
+
+func handleResetPassword(c *gin.Context) {
+	if c.Request.Method == "GET" {
+		token := c.Query("token")
+		// Tampilkan form sederhana atau arahkan ke frontend
+		c.Writer.Header().Set("Content-Type", "text/html")
+		html := fmt.Sprintf(`
+			<html>
+			<body>
+				<h2>Reset Password</h2>
+				<form action="/api/v1/auth/reset-password" method="POST">
+					<input type="hidden" name="token" value="%s">
+					<input type="password" name="password" placeholder="Password Baru" required minlength="6">
+					<button type="submit">Ganti Password</button>
+				</form>
+			</body>
+			</html>
+		`, token)
+		c.Writer.Write([]byte(html))
+		return
+	}
+
+	// Handle POST (form submission)
+	token := c.PostForm("token")
+	newPassword := c.PostForm("password")
+
+	if token == "" || newPassword == "" {
+		// Coba bind JSON jika bukan dari form HTML (untuk API frontend)
+		var req struct {
+			Token    string `json:"token"`
+			Password string `json:"password"`
+		}
+		if err := c.ShouldBindJSON(&req); err == nil {
+			token = req.Token
+			newPassword = req.Password
+		}
+	}
+
+	if token == "" || len(newPassword) < 6 {
+		JSONResponse(c, 400, "error", "Invalid token or password too short", nil)
+		return
+	}
+
+	hashed, _ := hashPassword(newPassword)
+	res, err := db.Exec("UPDATE users SET password = ?, verification_token = NULL WHERE verification_token = ?", hashed, token)
+	if err != nil {
+		JSONResponse(c, 500, "error", "Database error", nil)
+		return
+	}
+
+	rows, _ := res.RowsAffected()
+	if rows == 0 {
+		JSONResponse(c, 400, "error", "Invalid or expired token", nil)
+		return
+	}
+
+	c.Writer.Header().Set("Content-Type", "text/html")
+	c.Writer.Write([]byte("<h1>Password Berhasil Diganti!</h1><p>Silakan login kembali dengan password baru Anda.</p>"))
+}
+
 func main() {
 	godotenv.Load()
 	if err := initDB(); err != nil {
@@ -524,6 +633,9 @@ func main() {
 			auth.POST("/login", handleLogin)
 			auth.GET("/verify-email", handleVerifyEmail)
 			auth.GET("/me", authMiddleware(), handleMe)
+			auth.POST("/forgot-password", handleForgotPassword)
+			auth.GET("/reset-password", handleResetPassword)
+			auth.POST("/reset-password", handleResetPassword)
 		}
 
 		v1.GET("/docs", func(c *gin.Context) {
