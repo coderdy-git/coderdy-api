@@ -32,9 +32,11 @@ A high-performance, multi-instance WhatsApp Gateway built with Golang. This syst
 ## API Endpoints (v1)
 ### Public
 - `GET /api/v1/health`: Uptime & status check.
+- `GET /api/v1/docs`: Serve API documentation (Markdown).
 - `POST /api/v1/auth/register`: Create account (needs Email & Username).
 - `POST /api/v1/auth/login`: Get JWT token (Identifier: Username or Email).
 - `GET /api/v1/auth/verify-email`: Confirm registration via token.
+- `GET /api/v1/auth/me`: Get current user profile (Requires JWT).
 
 ### Protected (Requires JWT)
 - `GET /api/v1/whatsapp/sessions/connect`: Retrieve QR Code for scanning.

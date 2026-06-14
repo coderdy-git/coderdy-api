@@ -526,6 +526,10 @@ func main() {
 			auth.GET("/me", authMiddleware(), handleMe)
 		}
 
+		v1.GET("/docs", func(c *gin.Context) {
+			c.File("API_DOCS.md")
+		})
+
 		v1.POST("/webhook/receiver", handleWebhook)
 
 		wa := v1.Group("/whatsapp")
