@@ -199,6 +199,13 @@ func handleRegister(c *gin.Context) {
 		return
 	}
 
+	// Validasi Username Admin
+	lowerUsername := strings.ToLower(req.Username)
+	if lowerUsername == "admin" || strings.HasPrefix(lowerUsername, "admin") {
+		JSONResponse(c, 400, "error", "Username tidak diperbolehkan (reserved word)", nil)
+		return
+	}
+
 	var exists int
 	db.QueryRow("SELECT COUNT(*) FROM users WHERE username = ? OR email = ?", req.Username, req.Email).Scan(&exists)
 	if exists > 0 {
