@@ -453,7 +453,7 @@ func initDB() error {
 	var err error
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
-		dsn = "postgres://rizkyfauzi:rizkyfau_zi@coderdy-db:5432/coderdy-gateway?sslmode=disable"
+		dsn = "postgresql://coderdy:rizkyfau_zi@43.157.213.206:5432/coderdy?sslmode=disable"
 	}
 	db, err = sql.Open("postgres", dsn)
 	if err != nil {
@@ -619,7 +619,7 @@ func main() {
 	var err error
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
-		dsn = "postgres://rizkyfauzi:rizkyfau_zi@coderdy-db:5432/coderdy-gateway?sslmode=disable"
+		dsn = "postgresql://coderdy:rizkyfau_zi@43.157.213.206:5432/coderdy?sslmode=disable"
 	}
 	dbLog := waLog.Stdout("Database", "ERROR", true)
 	container, err = sqlstore.New(context.Background(), "postgres", dsn, dbLog)

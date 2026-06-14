@@ -6,7 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/joho/godotenv v1.5.1
-	github.com/lib/pq v1.10.9
+	github.com/lib/pq v1.12.3
 	github.com/sashabaranov/go-openai v1.41.2
 	github.com/ulule/limiter/v3 v3.11.2
 	go.mau.fi/whatsmeow v0.0.0-20260611094716-089932318bc2
