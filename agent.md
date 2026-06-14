@@ -37,6 +37,8 @@ A high-performance, multi-instance WhatsApp Gateway built with Golang. This syst
 - `POST /api/v1/auth/login`: Get JWT token (Identifier: Username or Email).
 - `GET /api/v1/auth/verify-email`: Confirm registration via token.
 - `GET /api/v1/auth/me`: Get current user profile (Requires JWT).
+- `POST /api/v1/auth/forgot-password`: Request password reset link.
+- `POST /api/v1/auth/reset-password`: Reset password using token.
 
 ### Protected (Requires JWT)
 - `GET /api/v1/whatsapp/sessions/connect`: Retrieve QR Code for scanning.

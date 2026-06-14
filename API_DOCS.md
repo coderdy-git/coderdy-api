@@ -74,7 +74,30 @@ Mendapatkan informasi profil user yang sedang login.
 }
 ```
 
-### 5. Verify Email
+### 5. Forgot Password
+Meminta link reset password dikirim ke email.
+- **URL:** `/auth/forgot-password`
+- **Method:** `POST`
+- **Body:**
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+### 6. Reset Password
+Melakukan penggantian password.
+- **URL:** `/auth/reset-password`
+- **Method:** `POST`
+- **Body:**
+```json
+{
+  "token": "TOKEN_DARI_EMAIL",
+  "password": "newpassword123"
+}
+```
+
+### 7. Verify Email
 Endpoint yang dipanggil dari link di email.
 - **URL:** `/auth/verify-email?token=TOKEN_DARI_EMAIL`
 - **Method:** `GET`
