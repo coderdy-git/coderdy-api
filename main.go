@@ -376,6 +376,8 @@ func handleSend(c *gin.Context) {
 		JSONResponse(c, 500, "error", "Failed to send message", nil)
 		return
 	}
+
+	incrementMessageCount(username)
 	JSONResponse(c, 200, "success", "Message sent", nil)
 }
 
@@ -427,6 +429,8 @@ func eventHandler(client *whatsmeow.Client, username string) func(interface{}) {
 
 					client.SendMessage(ctx, v.Info.Sender, &waE2E.Message{Conversation: proto.String(aiResponse)})
 
+					incrementMessageCount(username)
+
 					sendWebhook(map[string]interface{}{
 						"event":   "message_replied",
 						"from":    jid,
@@ -458,22 +462,33 @@ func initDB() error {
 		password TEXT,
 		is_verified INTEGER DEFAULT 0,
 		verification_token TEXT,
-		system_prompt TEXT
+		system_prompt TEXT,
+		message_count INTEGER DEFAULT 0
 	)`)
-	return err
+	return nil
 }
+
+func incrementMessageCount(username string) {
+	_, err := db.Exec("UPDATE users SET message_count = message_count + 1 WHERE username = ?", username)
+	if err != nil {
+		fmt.Printf("Error incrementing count for %s: %v\n", username, err)
+	}
+}
+
 
 func handleMe(c *gin.Context) {
 	username := c.MustGet("username").(string)
 	var email string
-	err := db.QueryRow("SELECT email FROM users WHERE username = $1", username).Scan(&email)
+	var messageCount int
+	err := db.QueryRow("SELECT email, message_count FROM users WHERE username = $1", username).Scan(&email, &messageCount)
 	if err != nil {
 		JSONResponse(c, 404, "error", "User not found", nil)
 		return
 	}
 	JSONResponse(c, 200, "success", "User profile retrieved", gin.H{
-		"username": username,
-		"email":    email,
+		"username":      username,
+		"email":         email,
+		"message_count": messageCount,
 	})
 }
 
