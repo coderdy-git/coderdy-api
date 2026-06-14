@@ -473,7 +473,7 @@ func initDB() error {
 }
 
 func incrementMessageCount(username string) {
-	_, err := db.Exec("UPDATE users SET message_count = message_count + 1 WHERE username = ?", username)
+	_, err := db.Exec("UPDATE users SET message_count = message_count + 1 WHERE username = $1", username)
 	if err != nil {
 		fmt.Printf("Error incrementing count for %s: %v\n", username, err)
 	}
