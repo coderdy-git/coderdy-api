@@ -57,7 +57,24 @@ Mendapatkan token akses.
 }
 ```
 
-### 4. Verify Email
+### 4. Get Current User (Me)
+Mendapatkan informasi profil user yang sedang login.
+- **URL:** `/auth/me`
+- **Method:** `GET`
+- **Headers:** `Authorization: Bearer <token>`
+- **Response:**
+```json
+{
+  "code": 200,
+  "status": "success",
+  "data": {
+    "username": "coderdy",
+    "email": "admin@coderdy.com"
+  }
+}
+```
+
+### 5. Verify Email
 Endpoint yang dipanggil dari link di email.
 - **URL:** `/auth/verify-email?token=TOKEN_DARI_EMAIL`
 - **Method:** `GET`
