@@ -301,7 +301,11 @@ func handleConnect(c *gin.Context) {
 	defer clientsMutex.Unlock()
 
 	if cli, ok := clients[username]; ok && cli.IsConnected() {
-		JSONResponse(c, 200, "connected", "Already connected", gin.H{"jid": cli.Store.ID.String()})
+		if cli.Store != nil && cli.Store.ID != nil {
+			JSONResponse(c, 200, "connected", "Already connected", gin.H{"jid": cli.Store.ID.String()})
+		} else {
+			JSONResponse(c, 200, "connected", "Already connected", nil)
+		}
 		return
 	}
 
@@ -343,7 +347,7 @@ func handleStatus(c *gin.Context) {
 	cli, ok := clients[username]
 	clientsMutex.RUnlock()
 
-	if !ok || !cli.IsConnected() {
+	if !ok || !cli.IsConnected() || cli.Store == nil || cli.Store.ID == nil {
 		JSONResponse(c, 200, "disconnected", "Not connected", nil)
 		return
 	}
