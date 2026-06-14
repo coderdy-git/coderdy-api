@@ -460,6 +460,20 @@ func initDB() error {
 	return nil
 }
 
+func handleMe(c *gin.Context) {
+	username := c.MustGet("username").(string)
+	var email string
+	err := db.QueryRow("SELECT email FROM users WHERE username = ?", username).Scan(&email)
+	if err != nil {
+		JSONResponse(c, 404, "error", "User not found", nil)
+		return
+	}
+	JSONResponse(c, 200, "success", "User profile retrieved", gin.H{
+		"username": username,
+		"email":    email,
+	})
+}
+
 func main() {
 	godotenv.Load()
 	if err := initDB(); err != nil {
@@ -509,6 +523,7 @@ func main() {
 			auth.POST("/register", handleRegister)
 			auth.POST("/login", handleLogin)
 			auth.GET("/verify-email", handleVerifyEmail)
+			auth.GET("/me", authMiddleware(), handleMe)
 		}
 
 		v1.POST("/webhook/receiver", handleWebhook)
