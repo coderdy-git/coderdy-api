@@ -372,6 +372,31 @@ func handleSend(c *gin.Context) {
 	JSONResponse(c, 200, "success", "Message sent", nil)
 }
 
+func handleWebhook(c *gin.Context) {
+	// Verifikasi Secret
+	secret := c.GetHeader("X-Webhook-Secret")
+	if secret != os.Getenv("WEBHOOK_SECRET") {
+		c.JSON(401, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var data map[string]interface{}
+	if err := c.ShouldBindJSON(&data); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid data"})
+		return
+	}
+
+	// Untuk sementara, kita log ke console server
+	fmt.Printf("\n--- WEBHOOK RECEIVED ---\n")
+	fmt.Printf("Event: %v\n", data["event"])
+	fmt.Printf("From: %v\n", data["from"])
+	fmt.Printf("Message: %v\n", data["message"])
+	fmt.Printf("AI Reply: %v\n", data["reply"])
+	fmt.Printf("------------------------\n\n")
+
+	c.JSON(200, gin.H{"status": "received"})
+}
+
 func eventHandler(client *whatsmeow.Client, username string) func(interface{}) {
 	return func(evt interface{}) {
 		switch v := evt.(type) {
@@ -462,6 +487,9 @@ func main() {
 			auth.POST("/login", handleLogin)
 			auth.GET("/verify-email", handleVerifyEmail)
 		}
+
+		v1.POST("/webhook/receiver", handleWebhook)
+
 		wa := v1.Group("/whatsapp")
 		wa.Use(authMiddleware())
 		{
