@@ -1,0 +1,16 @@
+services:
+  wa-gateway:
+    build: .
+    container_name: wa-gateway
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    volumes:
+      - wa-data:/app/data
+    env_file:
+      - .env
+    environment:
+      - PORT=8080
+
+volumes:
+  wa-data:

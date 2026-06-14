@@ -16,7 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 	"github.com/sashabaranov/go-openai"
 	"github.com/ulule/limiter/v3"
 	mgin "github.com/ulule/limiter/v3/drivers/middleware/gin"
@@ -135,7 +135,7 @@ func sendWebhook(data interface{}) {
 
 func getSystemPrompt(username string) string {
 	var prompt sql.NullString
-	err := db.QueryRow("SELECT system_prompt FROM users WHERE username = ?", username).Scan(&prompt)
+	err := db.QueryRow("SELECT system_prompt FROM users WHERE username = $1", username).Scan(&prompt)
 	if err == nil && prompt.Valid && prompt.String != "" {
 		return prompt.String
 	}
@@ -207,7 +207,7 @@ func handleRegister(c *gin.Context) {
 	}
 
 	var exists int
-	db.QueryRow("SELECT COUNT(*) FROM users WHERE username = ? OR email = ?", req.Username, req.Email).Scan(&exists)
+	db.QueryRow("SELECT COUNT(*) FROM users WHERE username = $1 OR email = $2", req.Username, req.Email).Scan(&exists)
 	if exists > 0 {
 		JSONResponse(c, 409, "error", "Username or Email already registered", nil)
 		return
@@ -215,7 +215,7 @@ func handleRegister(c *gin.Context) {
 
 	token := generateRandomToken()
 	hashed, _ := hashPassword(req.Password)
-	_, err := db.Exec("INSERT INTO users (username, email, password, verification_token) VALUES (?, ?, ?, ?)", req.Username, req.Email, hashed, token)
+	_, err := db.Exec("INSERT INTO users (username, email, password, verification_token) VALUES ($1, $2, $3, $4)", req.Username, req.Email, hashed, token)
 	if err != nil {
 		JSONResponse(c, 500, "error", "Failed to register user", err.Error())
 		return
@@ -234,13 +234,13 @@ func handleVerifyEmail(c *gin.Context) {
 	}
 
 	var username string
-	err := db.QueryRow("SELECT username FROM users WHERE verification_token = ?", token).Scan(&username)
+	err := db.QueryRow("SELECT username FROM users WHERE verification_token = $1", token).Scan(&username)
 	if err != nil {
 		JSONResponse(c, 400, "error", "Invalid or expired token", nil)
 		return
 	}
 
-	_, err = db.Exec("UPDATE users SET is_verified = 1, verification_token = NULL WHERE username = ?", username)
+	_, err = db.Exec("UPDATE users SET is_verified = 1, verification_token = NULL WHERE username = $1", username)
 	if err != nil {
 		JSONResponse(c, 500, "error", "Failed to verify email", nil)
 		return
@@ -262,7 +262,7 @@ func handleLogin(c *gin.Context) {
 
 	var username, hashedPassword string
 	var isVerified int
-	err := db.QueryRow("SELECT username, password, is_verified FROM users WHERE username = ? OR email = ?", req.Identifier, req.Identifier).Scan(&username, &hashedPassword, &isVerified)
+	err := db.QueryRow("SELECT username, password, is_verified FROM users WHERE username = $1 OR email = $2", req.Identifier, req.Identifier).Scan(&username, &hashedPassword, &isVerified)
 	if err != nil || !checkPassword(req.Password, hashedPassword) {
 		JSONResponse(c, 401, "error", "Invalid credentials", nil)
 		return
@@ -287,7 +287,7 @@ func handleUpdatePrompt(c *gin.Context) {
 		return
 	}
 
-	_, err := db.Exec("UPDATE users SET system_prompt = ? WHERE username = ?", req.Prompt, username)
+	_, err := db.Exec("UPDATE users SET system_prompt = $1 WHERE username = $2", req.Prompt, username)
 	if err != nil {
 		JSONResponse(c, 500, "error", "Failed to update prompt", nil)
 		return
@@ -443,13 +443,16 @@ func eventHandler(client *whatsmeow.Client, username string) func(interface{}) {
 // --- CORE ---
 func initDB() error {
 	var err error
-	db, err = sql.Open("sqlite3", "file:wa_gateway.db?_journal_mode=WAL")
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "postgres://rizkyfauzi:rizkyfau_zi@coderdy-db:5432/coderdy-gateway?sslmode=disable"
+	}
+	db, err = sql.Open("postgres", dsn)
 	if err != nil {
 		return err
 	}
-	db.Exec("PRAGMA journal_mode=WAL;")
-	db.Exec(`CREATE TABLE IF NOT EXISTS users (
-		id INTEGER PRIMARY KEY AUTOINCREMENT, 
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS users (
+		id SERIAL PRIMARY KEY, 
 		username TEXT UNIQUE, 
 		email TEXT UNIQUE,
 		password TEXT,
@@ -457,13 +460,13 @@ func initDB() error {
 		verification_token TEXT,
 		system_prompt TEXT
 	)`)
-	return nil
+	return err
 }
 
 func handleMe(c *gin.Context) {
 	username := c.MustGet("username").(string)
 	var email string
-	err := db.QueryRow("SELECT email FROM users WHERE username = ?", username).Scan(&email)
+	err := db.QueryRow("SELECT email FROM users WHERE username = $1", username).Scan(&email)
 	if err != nil {
 		JSONResponse(c, 404, "error", "User not found", nil)
 		return
@@ -484,7 +487,7 @@ func handleForgotPassword(c *gin.Context) {
 	}
 
 	var username string
-	err := db.QueryRow("SELECT username FROM users WHERE email = ?", req.Email).Scan(&username)
+	err := db.QueryRow("SELECT username FROM users WHERE email = $1", req.Email).Scan(&username)
 	if err != nil {
 		// Untuk keamanan, jangan beri tahu jika email tidak ada, tapi tetap beri respon sukses
 		JSONResponse(c, 200, "success", "If your email is registered, you will receive a reset link.", nil)
@@ -492,7 +495,7 @@ func handleForgotPassword(c *gin.Context) {
 	}
 
 	token := generateRandomToken()
-	_, err = db.Exec("UPDATE users SET verification_token = ? WHERE email = ?", token, req.Email)
+	_, err = db.Exec("UPDATE users SET verification_token = $1 WHERE email = $2", token, req.Email)
 	if err != nil {
 		JSONResponse(c, 500, "error", "Failed to process request", nil)
 		return
@@ -567,7 +570,7 @@ func handleResetPassword(c *gin.Context) {
 	}
 
 	hashed, _ := hashPassword(newPassword)
-	res, err := db.Exec("UPDATE users SET password = ?, verification_token = NULL WHERE verification_token = ?", hashed, token)
+	res, err := db.Exec("UPDATE users SET password = $1, verification_token = NULL WHERE verification_token = $2", hashed, token)
 	if err != nil {
 		JSONResponse(c, 500, "error", "Database error", nil)
 		return
@@ -595,8 +598,12 @@ func main() {
 	openaiClient = openai.NewClientWithConfig(config)
 
 	var err error
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "postgres://rizkyfauzi:rizkyfau_zi@coderdy-db:5432/coderdy-gateway?sslmode=disable"
+	}
 	dbLog := waLog.Stdout("Database", "ERROR", true)
-	container, err = sqlstore.New(context.Background(), "sqlite3", "file:wa_sessions.db?_foreign_keys=on", dbLog)
+	container, err = sqlstore.New(context.Background(), "postgres", dsn, dbLog)
 	if err != nil {
 		panic(err)
 	}
